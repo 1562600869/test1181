@@ -27,7 +27,7 @@ def validate_frequency(frequency):
 
 def validate_date(date_str):
     try:
-        return datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+        return parse_date(date_str)
     except ValueError:
         raise ValueError(f'日期格式错误，应为 YYYY-MM-DD: {date_str}')
 
@@ -74,13 +74,17 @@ def create_issue(issue_name, receive_date):
     }
 
 
+def parse_date(date_str):
+    return datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+
+
 def calculate_overdue_days(issue):
     if issue['status'] != ISSUE_STATUS_BORROWED:
         return 0
     if not issue['due_date']:
         return 0
     today = datetime.date.today()
-    due_date = datetime.datetime.strptime(issue['due_date'], '%Y-%m-%d').date()
+    due_date = parse_date(issue['due_date'])
     delta = (today - due_date).days
     return max(0, delta)
 
@@ -96,6 +100,8 @@ def add_journal(journals, name, journal_type, publisher, frequency):
     for j in journals:
         if j['name'] == name:
             raise ValueError(f'期刊已存在: {name}')
+    validate_journal_type(journal_type)
+    validate_frequency(frequency)
     journal = create_journal(name, journal_type, publisher, frequency)
     journals.append(journal)
     return journal
@@ -127,8 +133,10 @@ def borrow_issue(journals, journal_name, issue_name, borrower, phone, days):
     issue = check_issue_exists(journal, issue_name)
     if not issue:
         raise ValueError(f'该期未登记: {journal_name} {issue_name}')
+    if issue['status'] == ISSUE_STATUS_BORROWED:
+        raise ValueError(f'该期刊已被借出，无法重复借阅')
     if issue['status'] != ISSUE_STATUS_AVAILABLE:
-        raise ValueError(f'该期刊当前不可借阅，状态: {issue["status"]}')
+        raise ValueError(f'该期刊当前状态为 {issue["status"]}，不可借阅')
     days = validate_days(days)
     phone = validate_phone(phone)
     today = datetime.date.today()
